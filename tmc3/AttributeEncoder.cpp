@@ -1306,11 +1306,10 @@ AttributeEncoder::encodeReflectancesTransformRaht(
 
   bool enableACRDOInterLayer = aps.raht_enable_code_layer && attrInterPredParams.enableAttrInterPred;
   bool enableACRDOIntraLayer = aps.rahtPredParams.raht_enable_intraPred_nonPred_code_layer && aps.rahtPredParams.raht_prediction_enabled_flag;
-  bool enableACRDOLastPred = aps.rahtPredParams.raht_last_component_prediction_enabled_flag && enableACRDOIntraLayer && attribCount > 1 && !aps.rahtPredParams.integer_haar_enable_flag;
-  bool enabelRDOCodinglayer = enableACRDOInterLayer || enableACRDOIntraLayer || enableACRDOLastPred;
-  
+  bool enableRDOCodinglayer = enableACRDOInterLayer || enableACRDOIntraLayer;
+
   if (attrInterPredParams.enableAttrInterPred) {
-    if (enabelRDOCodinglayer)
+    if (enableRDOCodinglayer)
       predEncoder.set(&encoder.arithmeticEncoder);
 
     const int voxelCount_ref = int(attrInterPredParams.getPointCount());
@@ -1337,7 +1336,7 @@ AttributeEncoder::encodeReflectancesTransformRaht(
     }
   }
   else {
-    if (enabelRDOCodinglayer) {
+    if (enableRDOCodinglayer) {
       predEncoder.reset();
       predEncoder.set(&encoder.arithmeticEncoder);
     }
@@ -1365,7 +1364,7 @@ AttributeEncoder::encodeReflectancesTransformRaht(
   if (zeroRun)
     encoder.encodeRunLength(zeroRun);
 
-  if (enabelRDOCodinglayer)
+  if (enableRDOCodinglayer)
     predEncoder.flush();
 
   const int64_t maxReflectance = (1 << desc.bitdepth) - 1;
@@ -1418,14 +1417,14 @@ AttributeEncoder::encodeColorsTransformRaht(
 
   bool enableACRDOInterLayer = aps.raht_enable_code_layer && attrInterPredParams.enableAttrInterPred;
   bool enableACRDOIntraLayer = aps.rahtPredParams.raht_enable_intraPred_nonPred_code_layer && aps.rahtPredParams.raht_prediction_enabled_flag;
-  bool enableACRDOLastPred = aps.rahtPredParams.raht_last_component_prediction_enabled_flag && enableACRDOIntraLayer && attribCount > 1 && !aps.rahtPredParams.integer_haar_enable_flag;
-  bool enabelRDOCodinglayer = enableACRDOInterLayer || enableACRDOIntraLayer || enableACRDOLastPred;
+  bool enableRDOCodinglayer = enableACRDOInterLayer || enableACRDOIntraLayer;
+
   if (attrInterPredParams.enableAttrInterPred) {
-    if (enabelRDOCodinglayer)
+    if (enableRDOCodinglayer)
       predEncoder.set(&encoder.arithmeticEncoder);
   }
   else {
-    if (enabelRDOCodinglayer) {
+    if (enableRDOCodinglayer) {
       predEncoder.reset();
       predEncoder.set(&encoder.arithmeticEncoder);
     }
@@ -1456,7 +1455,7 @@ AttributeEncoder::encodeColorsTransformRaht(
     encoder.encodeRunLength(zeroRun);
 
   
-  if (enabelRDOCodinglayer)
+  if (enableRDOCodinglayer)
     predEncoder.flush();
 
   int clipMax = (1 << desc.bitdepth) - 1;

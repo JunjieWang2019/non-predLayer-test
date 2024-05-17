@@ -629,11 +629,10 @@ AttributeDecoder::decodeReflectancesRaht(
   std::vector<int> attributes(attribCount * voxelCount);
   bool enableACRDOInterLayer = aps.raht_enable_code_layer && attrInterPredParams.enableAttrInterPred;
   bool enableACRDOIntraLayer = aps.rahtPredParams.raht_enable_intraPred_nonPred_code_layer && aps.rahtPredParams.raht_prediction_enabled_flag;
-  bool enableACRDOLastPred = aps.rahtPredParams.raht_last_component_prediction_enabled_flag && enableACRDOIntraLayer && attribCount > 1 && !aps.rahtPredParams.integer_haar_enable_flag;
-  bool enabelRDOCodinglayer = enableACRDOInterLayer || enableACRDOIntraLayer || enableACRDOLastPred;
+  bool enableRDOCodinglayer = enableACRDOInterLayer || enableACRDOIntraLayer;
 
   if (attrInterPredParams.enableAttrInterPred) {
-    if (enabelRDOCodinglayer)
+    if (enableRDOCodinglayer)
       predDecoder.set(&decoder.arithmeticDecoder);
     const int voxelCount_ref = int(attrInterPredParams.getPointCount());
     attrInterPredParams.paramsForInterRAHT.voxelCount = voxelCount_ref;
@@ -659,7 +658,7 @@ AttributeDecoder::decodeReflectancesRaht(
     }
   }
   else {
-    if (enabelRDOCodinglayer) {
+    if (enableRDOCodinglayer) {
       predDecoder.reset();
       predDecoder.set(&decoder.arithmeticDecoder);
     }
@@ -730,14 +729,13 @@ AttributeDecoder::decodeColorsRaht(
   std::vector<int> attributes(attribCount * voxelCount);
   bool enableACRDOInterLayer = aps.raht_enable_code_layer && attrInterPredParams.enableAttrInterPred;
   bool enableACRDOIntraLayer = aps.rahtPredParams.raht_enable_intraPred_nonPred_code_layer && aps.rahtPredParams.raht_prediction_enabled_flag;
-  bool enableACRDOLastPred = aps.rahtPredParams.raht_last_component_prediction_enabled_flag && enableACRDOIntraLayer && attribCount > 1 && !aps.rahtPredParams.integer_haar_enable_flag;
-  bool enabelRDOCodinglayer = enableACRDOInterLayer || enableACRDOIntraLayer || enableACRDOLastPred;
+  bool enableRDOCodinglayer = enableACRDOInterLayer || enableACRDOIntraLayer;
   if (attrInterPredParams.enableAttrInterPred) {
-    if (enabelRDOCodinglayer)
+    if (enableRDOCodinglayer)
       predDecoder.set(&decoder.arithmeticDecoder);
   }
   else {
-    if (enabelRDOCodinglayer) {
+    if (enableRDOCodinglayer) {
       predDecoder.reset();
       predDecoder.set(&decoder.arithmeticDecoder);
     }

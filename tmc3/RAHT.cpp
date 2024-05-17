@@ -107,11 +107,11 @@ PCCRAHTComputeLCP::computeLastComponentPredictionCoeff(const bool& enableNonPred
     sumk1k22 += mult;
     sumk1k11 += mult2;
     if (enableNonPred) {
-      auto& nonPredattr = nonPredCoeffs[coeffIdx];
-      int64_t nonPredmult = nonPredattr[1] * nonPredattr[2];
-      int64_t nonPredmult2 = nonPredattr[1] * nonPredattr[1];
-      nonPredSumk1k22 += nonPredmult;
-      nonPredSumk1k11 += nonPredmult2;
+      auto& nonPredAttr = nonPredCoeffs[coeffIdx];
+      int64_t nonPredMult = nonPredAttr[1] * nonPredAttr[2];
+      int64_t nonPredMult2 = nonPredAttr[1] * nonPredAttr[1];
+      nonPredSumk1k22 += nonPredMult;
+      nonPredSumk1k11 += nonPredMult2;
     }
   }
   int scale = 0;
@@ -1155,7 +1155,7 @@ uraht_process(
   std::vector<int64_t> fixedFilterTaps = {128, 128, 128, 127, 125, 121, 115};
   int skipInitLayersForFiltering = attrInterPredParams.paramsForInterRAHT.skipInitLayersForFiltering;
 
-  const int filterLayer = std::max(skipInitLayersForFiltering-1, 0);
+  const int filterLayer = std::max(skipInitLayersForFiltering - 1, 0);
   coder.setInterIntraEnabled(enableACRDOInterPred, enableACRDONonPred, enableFilterEstimation, filterLayer, attrInterPredParams.paramsForInterRAHT.raht_inter_prediction_depth_minus1);
 
   weightsLf.reserve(numPoints);
@@ -1412,17 +1412,17 @@ uraht_process(
       if (!isEncoder) {
         predMode = coder.decodeMode(enableACRDOInterPred,enableACRDONonPred);
         if (enableACRDOInterPred) {
-          if (enableACRDONonPred) {///<0: intraPred 1:interPred 2:nonPred
+          if (enableACRDONonPred) {// 0: intraPred 1:interPred 2:nonPred
             curLevelEnableACIntraPred = predMode == 0;
             curLevelEnableACInterPred = predMode == 1;
           }
-          else {///<0: intraPred 1:interPred
+          else {// 0: intraPred 1:interPred
             curLevelEnableACIntraPred = predMode == 0;
             curLevelEnableACInterPred = predMode == 1;
           }
         }
         else if (enableACRDONonPred) {
-          curLevelEnableACIntraPred = predMode == 0; ///<0: intraPred 1:nonPred
+          curLevelEnableACIntraPred = predMode == 0; // 0: intraPred 1:nonPred
         }
       } 
 	  else {
@@ -1619,7 +1619,7 @@ uraht_process(
         weightsParentIt->occupancy = occupancy;
         // indexes of the neighbouring parents
         int parentNeighIdx[19];
-        int childNeighIdx[12][8] ;
+        int childNeighIdx[12][8];
 
         int parentNeighCount = 0;
         if (rahtExtension && nodeCnt == 1) {
@@ -1931,7 +1931,7 @@ uraht_process(
           }
           if (curLevelEnableACIntraPred && intraSumCoeff < 3) {
 
-            int Rate = LUTbins[nonPredTrainZeros > 10 ? 10 : nonPredTrainZeros];
+            int nonPredRate = LUTbins[nonPredTrainZeros > 10 ? 10 : nonPredTrainZeros];
             if (nonPredTrainZeros > 10) {
               int temp = nonPredTrainZeros - 11;
               // prefix k =2
@@ -1941,14 +1941,14 @@ uraht_process(
                 a++;
                 temp >>= 1;
               }
-              Rate += 2 * a - 1;
+              nonPredRate += 2 * a - 1;
               // suffix  k=2
-              Rate += 2;
+              nonPredRate += 2;
             }
             //Rate = Rate / std::max(1, trainZeros);
-            Rate += (nonPredRatecoeff + 128) >> 8;
+            nonPredRate += (nonPredRatecoeff + 128) >> 8;
 
-            nonPredFlagRDOQ = (nonPredDist2 << 26) < lambda * Rate;
+            nonPredFlagRDOQ = (nonPredDist2 << 26) < lambda * nonPredRate;
           }
 
           // Track RL for RDOQ
