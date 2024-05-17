@@ -46,6 +46,7 @@
 #include "framectr.h"
 #include "geometry.h"
 #include "hls.h"
+#include "RAHT.h"
 
 namespace pcc {
 
@@ -115,6 +116,7 @@ private:
 private:
   // Decoder specific parameters
   DecoderParams _params;
+  ModeDecoder predDecoder;
 
   // Indicates that pointcloud output should be suppressed at a frame boundary
   bool _suppressOutput;

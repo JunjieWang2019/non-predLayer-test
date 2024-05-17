@@ -43,7 +43,7 @@
 #include "quantization.h"
 #include "RAHT.h"
 #include "FixedPoint.h"
-
+#include "pcc_chrono.h"
 #include <algorithm>
 
 // todo(df): promote to per-attribute encoder parameter
@@ -471,7 +471,8 @@ AttributeEncoder::encode(
   AttributeContexts& ctxtMem,
   PCCPointSet3& pointCloud,
   PayloadBuffer* payload,
-  AttributeInterPredParams& attrInterPredParams)
+  AttributeInterPredParams& attrInterPredParams,
+  ModeEncoder& predEncoder)
 {
   if (attr_aps.attr_encoding == AttributeEncoding::kRaw) {
     AttrRawEncoder::encode(sps, desc, attr_aps, abh, pointCloud, payload);
@@ -565,7 +566,7 @@ AttributeEncoder::encode(
     switch (attr_aps.attr_encoding) {
     case AttributeEncoding::kRAHTransform:
       encodeReflectancesTransformRaht(
-        desc, attr_aps, qpSet, pointCloud, encoder, attrInterPredParams);
+        desc, attr_aps, qpSet, pointCloud, encoder, attrInterPredParams,predEncoder);
       abh.raht_attr_layer_code_mode = attrInterPredParams.attr_layer_code_mode;
       break;
 
@@ -644,7 +645,7 @@ AttributeEncoder::encode(
     switch (attr_aps.attr_encoding) {
     case AttributeEncoding::kRAHTransform:
       encodeColorsTransformRaht(
-        desc, attr_aps, qpSet, pointCloud, encoder, attrInterPredParams);
+        desc, attr_aps, qpSet, pointCloud, encoder, attrInterPredParams,predEncoder);
       abh.raht_attr_layer_code_mode = attrInterPredParams.attr_layer_code_mode;
       break;
 
@@ -675,10 +676,10 @@ AttributeEncoder::encode(
     attrInterPredParams.enableAttrInterPred = false;
   }
 
-  abh.RAHTFilterTaps.clear();
+  /*abh.RAHTFilterTaps.clear();
   for (int filteridx = 0; filteridx < attrInterPredParams.paramsForInterRAHT.FilterTaps.size(); filteridx++) {
     abh.RAHTFilterTaps.push_back(attrInterPredParams.paramsForInterRAHT.FilterTaps[filteridx]);
-  }
+  }*/
   // write abh
   write(sps, attr_aps, abh, payload);
   _abh = nullptr;
@@ -1276,7 +1277,8 @@ AttributeEncoder::encodeReflectancesTransformRaht(
   const QpSet& qpSet,
   PCCPointSet3& pointCloud,
   PCCResidualsEncoder& encoder,
-  AttributeInterPredParams& attrInterPredParams)
+  AttributeInterPredParams& attrInterPredParams,
+  ModeEncoder& predEncoder)
 {
   const int voxelCount = int(pointCloud.getPointCount());
   std::vector<MortonCodeWithIndex> packedVoxel(voxelCount);
@@ -1302,7 +1304,15 @@ AttributeEncoder::encodeReflectancesTransformRaht(
     pointQpOffsets[n] = qpSet.regionQpOffset(pointCloud[packedVoxel[n].index]);
   }
 
+  bool enableACRDOInterLayer = aps.raht_enable_code_layer && attrInterPredParams.enableAttrInterPred;
+  bool enableACRDOIntraLayer = aps.rahtPredParams.raht_enable_intraPred_nonPred_code_layer && aps.rahtPredParams.raht_prediction_enabled_flag;
+  bool enableACRDOLastPred = aps.rahtPredParams.raht_last_component_prediction_enabled_flag && enableACRDOIntraLayer && attribCount > 1 && !aps.rahtPredParams.integer_haar_enable_flag;
+  bool enabelRDOCodinglayer = enableACRDOInterLayer || enableACRDOIntraLayer || enableACRDOLastPred;
+  
   if (attrInterPredParams.enableAttrInterPred) {
+    if (enabelRDOCodinglayer)
+      predEncoder.set(&encoder.arithmeticEncoder);
+
     const int voxelCount_ref = int(attrInterPredParams.getPointCount());
     attrInterPredParams.paramsForInterRAHT.voxelCount = voxelCount_ref;
     std::vector<MortonCodeWithIndex> packedVoxel_ref(voxelCount_ref);
@@ -1326,12 +1336,19 @@ AttributeEncoder::encodeReflectancesTransformRaht(
           packedVoxel_ref[n].index);
     }
   }
+  else {
+    if (enabelRDOCodinglayer) {
+      predEncoder.reset();
+      predEncoder.set(&encoder.arithmeticEncoder);
+    }
+  }
 
+  
   // Transform.
   regionAdaptiveHierarchicalTransform(
     aps.rahtPredParams, qpSet, pointQpOffsets.data(), mortonCode.data(),
     attributes.data(), attribCount, voxelCount, coefficients.data(),
-    aps.raht_extension, attrInterPredParams);
+    aps.raht_extension, attrInterPredParams,predEncoder);
 
   // Entropy encode.
   int zeroRun = 0;
@@ -1347,6 +1364,9 @@ AttributeEncoder::encodeReflectancesTransformRaht(
   }
   if (zeroRun)
     encoder.encodeRunLength(zeroRun);
+
+  if (enabelRDOCodinglayer)
+    predEncoder.flush();
 
   const int64_t maxReflectance = (1 << desc.bitdepth) - 1;
   const int64_t minReflectance = 0;
@@ -1368,7 +1388,8 @@ AttributeEncoder::encodeColorsTransformRaht(
   const QpSet& qpSet,
   PCCPointSet3& pointCloud,
   PCCResidualsEncoder& encoder,
-  AttributeInterPredParams& attrInterPredParams)
+  AttributeInterPredParams& attrInterPredParams,
+  ModeEncoder& predEncoder)
 {
   const int voxelCount = int(pointCloud.getPointCount());
   std::vector<MortonCodeWithIndex> packedVoxel(voxelCount);
@@ -1395,11 +1416,26 @@ AttributeEncoder::encodeColorsTransformRaht(
     pointQpOffsets[n] = qpSet.regionQpOffset(pointCloud[packedVoxel[n].index]);
   }
 
+  bool enableACRDOInterLayer = aps.raht_enable_code_layer && attrInterPredParams.enableAttrInterPred;
+  bool enableACRDOIntraLayer = aps.rahtPredParams.raht_enable_intraPred_nonPred_code_layer && aps.rahtPredParams.raht_prediction_enabled_flag;
+  bool enableACRDOLastPred = aps.rahtPredParams.raht_last_component_prediction_enabled_flag && enableACRDOIntraLayer && attribCount > 1 && !aps.rahtPredParams.integer_haar_enable_flag;
+  bool enabelRDOCodinglayer = enableACRDOInterLayer || enableACRDOIntraLayer || enableACRDOLastPred;
+  if (attrInterPredParams.enableAttrInterPred) {
+    if (enabelRDOCodinglayer)
+      predEncoder.set(&encoder.arithmeticEncoder);
+  }
+  else {
+    if (enabelRDOCodinglayer) {
+      predEncoder.reset();
+      predEncoder.set(&encoder.arithmeticEncoder);
+    }
+  }
+
   // Transform.
   regionAdaptiveHierarchicalTransform(
     aps.rahtPredParams, qpSet, pointQpOffsets.data(), mortonCode.data(),
     attributes.data(), attribCount, voxelCount, coefficients.data(),
-    aps.raht_extension, attrInterPredParams);
+    aps.raht_extension, attrInterPredParams,predEncoder);
 
   // Entropy encode.
   int values[attribCount];
@@ -1418,6 +1454,10 @@ AttributeEncoder::encodeColorsTransformRaht(
   }
   if (zeroRun)
     encoder.encodeRunLength(zeroRun);
+
+  
+  if (enabelRDOCodinglayer)
+    predEncoder.flush();
 
   int clipMax = (1 << desc.bitdepth) - 1;
   for (int n = 0; n < voxelCount; n++) {

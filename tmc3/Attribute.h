@@ -42,6 +42,7 @@
 #include "PCCPointSet.h"
 #include "PCCTMC3Common.h"
 #include "entropy.h"
+#include "RAHT.h"
 
 namespace pcc {
 
@@ -66,7 +67,8 @@ public:
     size_t payloadLen,
     AttributeContexts& ctxtMem,
     PCCPointSet3& pointCloud, 
-    AttributeInterPredParams& attrInterPredParams
+    AttributeInterPredParams& attrInterPredParams,
+    ModeDecoder& decoder
     ) = 0;
 
   // Indicates if the attribute decoder can decode the given aps
@@ -93,7 +95,8 @@ public:
     AttributeContexts& ctxtMem,
     PCCPointSet3& pointCloud,
     PayloadBuffer* payload, 
-    AttributeInterPredParams &attrInterPredParams
+    AttributeInterPredParams &attrInterPredParams,
+    ModeEncoder& predEncoder
   ) = 0;
 
   // Indicates if the attribute decoder can decode the given aps

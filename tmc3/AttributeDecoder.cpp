@@ -201,7 +201,8 @@ AttributeDecoder::decode(
   size_t payloadLen,
   AttributeContexts& ctxtMem,
   PCCPointSet3& pointCloud  ,
-  AttributeInterPredParams& attrInterPredParams
+  AttributeInterPredParams& attrInterPredParams,
+  ModeDecoder& predDecoder
   )
 {
   if (attr_aps.attr_encoding == AttributeEncoding::kRaw) {
@@ -282,7 +283,7 @@ AttributeDecoder::decode(
   if (attr_desc.attr_num_dimensions_minus1 == 0) {
     switch (attr_aps.attr_encoding) {
     case AttributeEncoding::kRAHTransform:
-      decodeReflectancesRaht(attr_desc, attr_aps, qpSet, decoder, pointCloud, attrInterPredParams);
+      decodeReflectancesRaht(attr_desc, attr_aps, qpSet, decoder, pointCloud, attrInterPredParams, predDecoder);
       break;
 
     case AttributeEncoding::kPredictingTransform:
@@ -304,7 +305,7 @@ AttributeDecoder::decode(
     switch (attr_aps.attr_encoding) {
     case AttributeEncoding::kRAHTransform:
       decodeColorsRaht(
-        attr_desc, attr_aps, qpSet, decoder, pointCloud, attrInterPredParams);
+        attr_desc, attr_aps, qpSet, decoder, pointCloud, attrInterPredParams, predDecoder);
       break;
 
     case AttributeEncoding::kPredictingTransform:
@@ -590,7 +591,8 @@ AttributeDecoder::decodeReflectancesRaht(
   const QpSet& qpSet,
   PCCResidualsDecoder& decoder,
   PCCPointSet3& pointCloud,
-  AttributeInterPredParams& attrInterPredParams)
+  AttributeInterPredParams& attrInterPredParams,
+  ModeDecoder& predDecoder)
 {
   const int voxelCount = int(pointCloud.getPointCount());
   std::vector<MortonCodeWithIndex> packedVoxel(voxelCount);
@@ -625,8 +627,14 @@ AttributeDecoder::decodeReflectancesRaht(
   
 
   std::vector<int> attributes(attribCount * voxelCount);
+  bool enableACRDOInterLayer = aps.raht_enable_code_layer && attrInterPredParams.enableAttrInterPred;
+  bool enableACRDOIntraLayer = aps.rahtPredParams.raht_enable_intraPred_nonPred_code_layer && aps.rahtPredParams.raht_prediction_enabled_flag;
+  bool enableACRDOLastPred = aps.rahtPredParams.raht_last_component_prediction_enabled_flag && enableACRDOIntraLayer && attribCount > 1 && !aps.rahtPredParams.integer_haar_enable_flag;
+  bool enabelRDOCodinglayer = enableACRDOInterLayer || enableACRDOIntraLayer || enableACRDOLastPred;
 
   if (attrInterPredParams.enableAttrInterPred) {
+    if (enabelRDOCodinglayer)
+      predDecoder.set(&decoder.arithmeticDecoder);
     const int voxelCount_ref = int(attrInterPredParams.getPointCount());
     attrInterPredParams.paramsForInterRAHT.voxelCount = voxelCount_ref;
     std::vector<MortonCodeWithIndex> packedVoxel_ref(voxelCount_ref);
@@ -650,11 +658,17 @@ AttributeDecoder::decodeReflectancesRaht(
           packedVoxel_ref[n].index);
     }
   }
+  else {
+    if (enabelRDOCodinglayer) {
+      predDecoder.reset();
+      predDecoder.set(&decoder.arithmeticDecoder);
+    }
+  }
 
   regionAdaptiveHierarchicalInverseTransform(
     aps.rahtPredParams, qpSet, pointQpOffsets.data(), mortonCode.data(),
     attributes.data(), attribCount, voxelCount, coefficients.data(),
-    aps.raht_extension, attrInterPredParams);
+    aps.raht_extension, attrInterPredParams,predDecoder);
 
   const int64_t maxReflectance = (1 << (int64_t)desc.bitdepth) - 1;
   const int64_t minReflectance = 0;
@@ -676,7 +690,8 @@ AttributeDecoder::decodeColorsRaht(
   const QpSet& qpSet,
   PCCResidualsDecoder& decoder,
   PCCPointSet3& pointCloud,
-  AttributeInterPredParams& attrInterPredParams)
+  AttributeInterPredParams& attrInterPredParams,
+  ModeDecoder& predDecoder)
 {
   const int voxelCount = int(pointCloud.getPointCount());
   std::vector<MortonCodeWithIndex> packedVoxel(voxelCount);
@@ -713,11 +728,25 @@ AttributeDecoder::decodeColorsRaht(
   }
 
   std::vector<int> attributes(attribCount * voxelCount);
+  bool enableACRDOInterLayer = aps.raht_enable_code_layer && attrInterPredParams.enableAttrInterPred;
+  bool enableACRDOIntraLayer = aps.rahtPredParams.raht_enable_intraPred_nonPred_code_layer && aps.rahtPredParams.raht_prediction_enabled_flag;
+  bool enableACRDOLastPred = aps.rahtPredParams.raht_last_component_prediction_enabled_flag && enableACRDOIntraLayer && attribCount > 1 && !aps.rahtPredParams.integer_haar_enable_flag;
+  bool enabelRDOCodinglayer = enableACRDOInterLayer || enableACRDOIntraLayer || enableACRDOLastPred;
+  if (attrInterPredParams.enableAttrInterPred) {
+    if (enabelRDOCodinglayer)
+      predDecoder.set(&decoder.arithmeticDecoder);
+  }
+  else {
+    if (enabelRDOCodinglayer) {
+      predDecoder.reset();
+      predDecoder.set(&decoder.arithmeticDecoder);
+    }
+  }
 
   regionAdaptiveHierarchicalInverseTransform(
     aps.rahtPredParams, qpSet, pointQpOffsets.data(), mortonCode.data(),
     attributes.data(), attribCount, voxelCount, coefficients.data(),
-    aps.raht_extension, attrInterPredParams);
+    aps.raht_extension, attrInterPredParams,predDecoder);
 
   int clipMax = (1 << desc.bitdepth) - 1;
   for (int n = 0; n < voxelCount; n++) {

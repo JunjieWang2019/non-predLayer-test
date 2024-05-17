@@ -1260,7 +1260,7 @@ PCCTMC3Encoder3::compressPartition(
 
     auto& ctxtMemAttr = _ctxtMemAttrs.at(abh.attr_sps_attr_idx);
     attrEncoder->encode(
-      *_sps, attr_sps, attr_aps, abh, ctxtMemAttr, pointCloud, &payload, attrInterPredParams);
+      *_sps, attr_sps, attr_aps, abh, ctxtMemAttr, pointCloud, &payload, attrInterPredParams, predCoder);
 
     if (reconCloudAlt && attr_aps.spherical_coord_flag && _gps->predgeom_enabled_flag)
       reconCloudAlt->cloud.append(pointCloud, _posSph);
