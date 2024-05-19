@@ -1153,7 +1153,7 @@ PCCTMC3Encoder3::compressPartition(
 
     attrInterPredParams.paramsForInterRAHT.raht_enable_inter_intra_layer_RDO =
       attr_aps.raht_enable_code_layer;
-    attrInterPredParams.attr_layer_code_mode.clear();
+
     if (attr_sps.attr_num_dimensions_minus1 == 0 && !_gps->geom_angular_mode_enabled_flag)
       attrInterPredParams.enableSkipCode = false;
     else

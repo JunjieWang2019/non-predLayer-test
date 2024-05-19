@@ -1155,9 +1155,6 @@ uraht_process(
   std::vector<int64_t> fixedFilterTaps = {128, 128, 128, 127, 125, 121, 115};
   int skipInitLayersForFiltering = attrInterPredParams.paramsForInterRAHT.skipInitLayersForFiltering;
 
-  const int filterLayer = std::max(skipInitLayersForFiltering - 1, 0);
-  coder.setInterIntraEnabled(enableACRDOInterPred, enableACRDONonPred, enableFilterEstimation, filterLayer, attrInterPredParams.paramsForInterRAHT.raht_inter_prediction_depth_minus1);
-
   weightsLf.reserve(numPoints);
   attrsLf.reserve(numPoints * numAttrs);
 
@@ -1294,6 +1291,7 @@ uraht_process(
   int8_t LcpCoeff = 0;
   int8_t nonPredLcpCoeff = 0;
   double dlambda = 1.0;
+  int filterIdx = 0;
   for (int level = levelHfPos.size() - 1, level_ref = levelHfPos_ref.size() - 1, isFirst = 1; level > 0; /*nop*/) {
     int numNodes = weightsHf.size() - levelHfPos[level];
     sumNodes += numNodes;
@@ -1463,16 +1461,28 @@ uraht_process(
       auto& q = quantizers[0];
       quantizedResFilterTap = q.quantize(residueFilterTap << kFixedPointAttributeShift);
       int64_t recResidueFilterTap = divExp2RoundHalfUp(q.scale(quantizedResFilterTap), kFixedPointAttributeShift);
-      interFilterTap = 128-recResidueFilterTap;
+	  interFilterTap = 128-recResidueFilterTap;
     } //end filter estimation
     
     //get filter tap at the decoder 
-    bool enabledecoderparsing = !isEncoder && (enableFilterEstimation) && curLevelEnableACInterPred && (treeDepth < treeDepthLimit) && (treeDepth >= skipInitLayersForFiltering);
-    if (enabledecoderparsing) {
+    bool enableDecoderParsing = false;
+
+	if (!isEncoder && enableFilterEstimation && enableACRDOInterPred && curLevelEnableACInterPred && 
+      (treeDepth >= skipInitLayersForFiltering))
+	{
+      enableDecoderParsing = true;
+    }
+	else if (!isEncoder && enableFilterEstimation && !enableACRDOInterPred && enableACInterPred && 
+      (treeDepth >= skipInitLayersForFiltering)) 
+	{
+	  enableDecoderParsing = true;
+	}
+
+    if (enableDecoderParsing) {
       auto quantizers = qpset.quantizers(qpLayer, {0,0});
       auto& q = quantizers[0];
-      int idxtoread= treeDepth - skipInitLayersForFiltering;
-      quantizedResFilterTap = coder.decodeFilter();
+      quantizedResFilterTap = attrInterPredParams.paramsForInterRAHT.FilterTaps[filterIdx];
+      filterIdx++;
       int64_t recResidueFilterTap = divExp2RoundHalfUp(q.scale(quantizedResFilterTap), kFixedPointAttributeShift);
       interFilterTap = 128 - recResidueFilterTap;
     }
@@ -2035,9 +2045,9 @@ uraht_process(
             
             FixedPoint fOrgResidue, fIntraResidue, fNonPredResidue;
             fOrgResidue.val = origsamples[k][idx].val - transformPredBuf[k][idx].val;
-            
-            
-            
+                  
+
+
             if (enableRDOCodingLayer)
               curEstimate.resStatUpdate(coeff, k);
 
@@ -2284,9 +2294,10 @@ uraht_process(
             intraEstimate = curEstimate;
             nonPredEstimate = curEstimate;
             coder._encodeMode(1,enableACRDOInterPred, enableACRDONonPred);
-            if (enableEstimateLayer) {
-              coder._encodeFilter(quantizedResFilterTap);
-            }
+            if (enableEstimateLayer)
+			  attrInterPredParams.paramsForInterRAHT.FilterTaps.push_back(
+				quantizedResFilterTap);
+
             intraTrainZeros = trainZeros;
             nonPredTrainZeros = trainZeros;
           }
@@ -2309,7 +2320,9 @@ uraht_process(
             intraEstimate = curEstimate;
             coder._encodeMode(1,enableACRDOInterPred, enableACRDONonPred);
             if (enableEstimateLayer)
-              coder._encodeFilter(quantizedResFilterTap);
+              attrInterPredParams.paramsForInterRAHT.FilterTaps.push_back(
+                quantizedResFilterTap);
+
             intraTrainZeros = trainZeros;
           }
         }
@@ -2340,7 +2353,14 @@ uraht_process(
       curEstimate.resetCostBits();
       intraEstimate.resetCostBits();
       nonPredEstimate.resetCostBits();
+    } 
+	else if (isEncoder && enableEstimateLayer) 
+	{//case 1: skip = 0; case 2: RDO coding layer is disabled
+      attrInterPredParams.paramsForInterRAHT.FilterTaps.push_back(
+        quantizedResFilterTap);
     }
+
+
     if (enableRDOCodingLayer)
       ++depth;
     sumNodes = 0;

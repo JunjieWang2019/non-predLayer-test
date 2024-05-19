@@ -858,13 +858,12 @@ PCCTMC3Decoder3::decodeAttributeBrick(const PayloadBuffer& buf)
   attrInterPredParams.paramsForInterRAHT.enableFilterEstimation = attr_aps.raht_send_inter_filters;
   attrInterPredParams.paramsForInterRAHT.skipInitLayersForFiltering = attr_aps.raht_inter_skip_layers;
   attrInterPredParams.paramsForInterRAHT.FilterTaps.clear();
-  /*if (attr_aps.raht_send_inter_filters && abh.enableAttrInterPred) {
+  if (attr_aps.raht_send_inter_filters && abh.enableAttrInterPred) {
     attrInterPredParams.paramsForInterRAHT.FilterTaps = abh.RAHTFilterTaps;
-  }*/
+  }
 
   attrInterPredParams.paramsForInterRAHT.raht_enable_inter_intra_layer_RDO =
     attr_aps.raht_enable_code_layer;
-  attrInterPredParams.attr_layer_code_mode = abh.raht_attr_layer_code_mode;
   if (attr_sps.attr_num_dimensions_minus1 == 0 && !_gps->geom_angular_mode_enabled_flag)
     attrInterPredParams.enableSkipCode = false;
   else

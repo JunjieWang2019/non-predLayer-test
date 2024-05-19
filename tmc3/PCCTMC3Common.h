@@ -247,7 +247,6 @@ struct AttributeInterPredParamsForRAHT {
   AttributeInterPredBufRAHT bufForInterRAHT;
   PredBufRAHT* cur;
   PredBufRAHT* ref;
-  std::vector<int> attr_layer_code_mode;
 
   void swapBuffersRef(const int numAttrDimMinus1)
   {
@@ -294,7 +293,6 @@ struct AttributeInterPredParams {
   {
     return attrInterIntraSliceRDO && enableAttrInterPred;
   }
-  std::vector<int> attr_layer_code_mode;
 };
 
 
